@@ -1,0 +1,73 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.SignalR.Client
+@inject NavigationManager NavigationManager
+@implements IAsyncDisposable
+
+<PageTitle>Chat 2.0</PageTitle>
+
+<h1>Chat privé</h1>
+
+Bienvenu sur le chat utilisant SignalR et Blazor Server
+
+<SurveyPrompt Title="Contactez-moi ici tsiazezephirin@gmail.com" />
+
+<div class="form-group">
+    <label>
+        Utilisateur :
+        <input @bind="username" />
+    </label>
+</div>
+<div class="form-group">
+    <label>
+        Message
+        <input @bind="message" size="50" />
+    </label>
+</div>
+<button class="btn btn-prima" @onclick="Send" disabled="@(!IsConnected)">Envoyer</button>
+
+<hr />
+<ul id="ListeMessage">
+    @foreach (var message in messages)
+    {
+        <li>@message</li>
+    }
+</ul>
+@code {
+    private HubConnection? hubConnection;
+    private List<string> messages = new List<string>();
+    private string? username;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/chathub"))
+            .Build();
+
+        hubConnection.On<string, string>("ReceiveMessage", (user, message) =>
+        {
+            var encodeMsg = $"{user}: {message}";
+            messages.Add(encodeMsg);
+            StateHasChanged();
+        });
+        await hubConnection.StartAsync();
+    }
+
+    private async Task Send()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.SendAsync("SendMessage", username, message);
+        }
+    }
+
+    public bool IsConnected => hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}
